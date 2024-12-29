@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sentiment Analysis & Average Score</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="../static/style.css">
+</head>
+<body>
+    <div class="container">
+        <section>
+            <h1>Sentiment Analysis</h1>
+            <p>Analyze the sentiment of any text and see how it scores based on positivity and negativity.</p>
+            <div class="content-wrapper">
+                <div>
+                    <div class="examples-toggle" onclick="toggleExamples()">Examples ▼</div>
+                    <div class="examples" id="examples">
+                        <div class="example">
+                            <div class="example-text" id="example1">Absolutely terrible experience. The product broke within a day, and customer service was completely unhelpful.</div>
+                            <button class="copy-button" onclick="copyExample('example1')">Copy</button>
+                        </div>
+                        <div class="example">
+                            <div class="example-text" id="example2">The product is okay for what it is, but it feels very cheaply made and unreliable.</div>
+                            <button class="copy-button" onclick="copyExample('example2')">Copy</button>
+                        </div>
+                        <div class="example">
+                            <div class="example-text" id="example3">It's fine. Exactly what I expected, but it doesn't go beyond that.</div>
+                            <button class="copy-button" onclick="copyExample('example3')">Copy</button>
+                        </div>
+                        <div class="example">
+                            <div class="example-text" id="example4">The product is fine. It does what it promises but nothing more. It's not great, but not bad either.</div>
+                            <button class="copy-button" onclick="copyExample('example4')">Copy</button>
+                        </div>
+                        <div class="example">
+                            <div class="example-text" id="example5">Absolutely fantastic! Exceeded all my expectations and works perfectly. Highly recommend it!</div>
+                            <button class="copy-button" onclick="copyExample('example5')">Copy</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-container">
+                    <textarea id="review" rows="4" placeholder="Enter your review here..."></textarea><br>
+                    <button onclick="submitReview()">Analyze</button>
+                    <div id="loading" style="display: none;">Loading...</div>
+                    <div id="result-text"></div>
+                    <div id="raw-output"></div>
+                    <div class="stars">
+                        <div class="star" id="star1"></div>
+                        <div class="star" id="star2"></div>
+                        <div class="star" id="star3"></div>
+                        <div class="star" id="star4"></div>
+                        <div class="star" id="star5"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="divider"></div>
+        <section>
+            <h1>Average Score for Product</h1>
+            <p>Find the expected sentiment score for a product based on its reviews and compare it to the mean average of the actual ratings</p>
+            <form>
+                <label for="product_id">Select Product ID:</label>
+                <select name="product_id" id="product_id">
+                    {% for product_id in product_ids %}
+                        <option value="{{ product_id }}">{{ product_id }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            <h6>Note: Depending on the dataset size, the model can take anywhere between a few seconds to a few minutes to compute the output</h6>
+            <button type="button" onclick="fetchExpectedScore()">Model Expected Score</button>
+            <button type="button" onclick="fetchAverageScore()">Mean Average Score</button>
+            <div class="result-container">
+                <div id="expected_result" class="result-text"></div>
+                <div id="expected-stars" class="stars"></div>
+            </div>
+            <div class="result-container">
+                <div id="result" class="result-text"></div>
+                <div id="average-stars" class="stars"></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function toggleExamples() {
+            const examples = document.getElementById('examples');
+            examples.style.display = examples.style.display === 'none' || !examples.style.display ? 'block' : 'none';
+        }
+
+        function copyExample(exampleId) {
+            const exampleText = document.getElementById(exampleId).innerText;
+            document.getElementById('review').value = exampleText;
+        }
+
+        async function submitReview() {
+            const review = document.getElementById('review').value;
+            document.getElementById('loading').style.display = 'block';
+
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ review })
+            });
+
+            const data = await response.json();
+            document.getElementById('loading').style.display = 'none';
+
+            if (response.ok) {
+                document.getElementById('result-text').innerText = `Sentiment: ${data.result}`;
+                //document.getElementById('raw-output').innerText = `Raw Output: ${JSON.stringify(data.raw_output)}`; // In case you want to see the raw output.
+
+                for (let i = 1; i <= 5; i++) {
+                    const star = document.getElementById(`star${i}`);
+                    star.classList.remove('filled');
+                    if (i <= data.rating) {
+                        star.classList.add('filled');
+                    }
+                }
+            } else {
+                alert(data.error || "An error occurred");
+            }
+        }
+
+        async function fetchAverageScore() {
+            const productId = document.getElementById('product_id').value;
+            const response = await fetch('/average_score', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productId })
+            });
+
+            const data = await response.json();
+            document.getElementById('result').innerText = data.result;
+            updateStars('average-stars', data.rating);
+        }
+
+        async function fetchExpectedScore() {
+            const productId = document.getElementById('product_id').value;
+            const response = await fetch('/expected_score', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productId })
+            });
+
+            const data = await response.json();
+            document.getElementById('expected_result').innerText = data.result;
+            updateStars('expected-stars', data.rating);
+        }
+
+        function updateStars(starContainerId, rating) {
+            const starContainer = document.getElementById(starContainerId);
+            starContainer.innerHTML = '';
+            for (let i = 1; i <= 5; i++) {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                if (i <= rating) {
+                    star.classList.add('filled');
+                }
+                starContainer.appendChild(star);
+            }
+        }
+    </script>
+</body>
+</html>

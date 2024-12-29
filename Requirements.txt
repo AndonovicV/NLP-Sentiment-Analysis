@@ -1,0 +1,10 @@
+```plaintext
+flask
+transformers
+torch
+pandas
+numpy
+matplotlib
+seaborn
+nltk
+tqdm
